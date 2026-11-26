@@ -8,7 +8,10 @@
 // v2 (Claude review of the v1 frames): the horizon disc no longer sits
 // big in the middle of a chase view, where it covered the plane and the
 // rings. In chase it docks small at bottom centre, above the flaps
-// panel; the full-size disc lives only in the cockpit view. The compass
+// panel. v2 light fix (26 Nov, shot 2): the cockpit view docked the disc
+// the same way, in the dial row at (640, 500) — the chase dock (640, 548)
+// would hide the middle of the yoke handle bar. The full-size centre
+// disc is gone from both views.
 // is a true linear tape (degrees spaced by degrees, not by label), the
 // mission line is 20 px and wraps inside its panel, the side tapes are
 // cut to their content, LOW ALT stays quiet when the gear is down and
@@ -56,9 +59,12 @@
       '<text id="waypointLabel" x="1250" y="38" font-size="14" fill="#E8E2D2">NEXT RING</text>' +
       '<text id="waypointDist" x="1250" y="62" font-size="22" fill="' + P.hudCyan + '" font-weight="bold">0 m</text>' +
       '</g>' +
-      // Artificial horizon. In the cockpit it is the big centre disc;
-      // in chase view the same disc docks small at bottom centre, above
-      // the flaps panel, so it can never cover the plane or a ring.
+      // Artificial horizon. The disc is docked small at bottom centre in
+      // BOTH views, so it can never cover the plane, a ring, or the
+      // forward view through the windshield: chase docks it at (640, 548)
+      // above the flaps panel; cockpit docks it at (640, 500) in the dial
+      // row, between the two inner dials — (640, 548) would hide the
+      // middle of the yoke handle bar (Faa 26 Nov 16:56, shot 2 defect).
       '<g id="horizonGroup">' +
       '<circle cx="640" cy="310" r="90" fill="' + P.bezel + '"/>' +
       '<g clip-path="url(#horizonClip)"><g id="horizonMove">' +
@@ -182,12 +188,18 @@
     el.pitchLadder.innerHTML = html;
   }
 
-  // Chase: the disc docks small at bottom centre (640, 548), radius 38.
-  // Cockpit: the disc is full size at the centre of the view.
+  // Both views dock the disc small at bottom centre (scale 0.475,
+  // radius 38): chase at (640, 548), just above the flaps panel;
+  // cockpit at (640, 500), in the dial row between the two inner dials.
+  // The full-size disc at dead centre used to cover the plane (chase)
+  // and the forward view through the windshield (cockpit) — Faa 26 Nov
+  // 16:18, 16:56, shot 2 defect. Cockpit cannot use the chase dock:
+  // (640, 548) hides the middle of the yoke handle bar.
   function applyView() {
     if (!el.horizonGroup) return;
     if (view === 'cockpit') {
-      el.horizonGroup.setAttribute('transform', '');
+      el.horizonGroup.setAttribute('transform',
+        'translate(640 500) scale(0.475) translate(-640 -310)');
     } else {
       el.horizonGroup.setAttribute('transform',
         'translate(640 548) scale(0.475) translate(-640 -310)');
