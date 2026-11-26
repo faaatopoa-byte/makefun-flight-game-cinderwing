@@ -56,8 +56,8 @@
       camera.position.set(ex, ey, ez);
       camera.lookAt(
         state.position.x + f.x * 60,
-        state.position.y + f.y * 60,
-        state.position.z + f.z * 60);
+        state.position.y + f.y * 60 - 4, // the pilot's eye sits a touch
+        state.position.z + f.z * 60);   // low: gates below read in frame
       camera.rotation.z += state.roll * 0.5;
     }
 
@@ -84,15 +84,16 @@
         // offset is small so the wingtip stays inside the frame. The
         // camera rides higher and looks down a touch, so the plane and
         // the buoy ring sit below the horizon instrument.
-        camera.position.set(p.x - f.x * 16 + 4, p.y + 9, p.z - f.z * 16 - 2);
+        camera.position.set(p.x - f.x * 18 + 4, p.y + 9, p.z - f.z * 18 - 2);
         camera.lookAt(p.x + f.x * 30, p.y - 10, p.z + f.z * 30);
       } else if (n === 4) {
-        // Threshold chase: low behind, offset to the side so the plane
-        // sits left of the horizon instrument instead of behind it,
-        // runway and target zone ahead.
-        var right4 = { x: right.x, y: 0, z: right.z };
-        camera.position.set(p.x - f.x * 20 + right4.x * 12, p.y + 1.5, p.z - f.z * 20 + right4.z * 12);
-        camera.lookAt(p.x + f.x * 55, p.y - 1, p.z + f.z * 55);
+        // Deck landing: front-right three-quarter, high enough that
+        // the painted target ring reads as a ring around the plane
+        // instead of a green band across the frame — never dead astern,
+        // where the plane is a white blob, and never so close that the
+        // ring passes through the camera.
+        camera.position.set(p.x + f.x * 22 + right.x * 13, p.y + 8, p.z + f.z * 22 + right.z * 13);
+        camera.lookAt(p.x + f.x * 4, p.y - 1, p.z + f.z * 4);
       }
       // No roll on presets: a level camera keeps the bank readable.
     }

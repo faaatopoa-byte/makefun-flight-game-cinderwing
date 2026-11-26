@@ -14,6 +14,7 @@
   var camMod = window.Cinderwing.camera;
   var hud = window.Cinderwing.hud;
   var audio = window.Cinderwing.audio;
+  var cockpitMod = window.Cinderwing.cockpit;
 
   var STEP = 1 / 60;
   var MAX_FRAME = 0.25;
@@ -39,6 +40,10 @@
   world.build(scene);
   var plane = aircraftMod.buildAircraft(scene);
   var cameraCtl = camMod.createCamera(camera);
+  // The camera carries the cockpit interior as a child, so it must be
+  // part of the scene graph for the dash to render.
+  scene.add(camera);
+  cockpitMod.build(camera);
   hud.build(hudSvg);
 
   var missionIndex = 0;
@@ -103,10 +108,13 @@
     var deck = cfg.WORLD.stackDeck;
     var ddx = deck.x - state.position.x;
     var ddz = deck.z - state.position.z;
+    if (state.onGround && phys.isOnDeck(state.position)) {
+      return { label: 'STACK DECK', distance: 0, objective: 'Cargo ' + Math.round(state.cargo) + '% INTACT · Delivered' };
+    }
     return {
       label: 'STACK DECK',
       distance: Math.sqrt(ddx * ddx + ddz * ddz),
-      objective: 'Cargo ' + Math.round(state.cargo) + '% · Land soft, under 3.5 m/s sink'
+      objective: 'Cargo ' + Math.round(state.cargo) + '% · Land under 3.5 m/s'
     };
   }
 
@@ -293,6 +301,16 @@
     audio.update(state);
   }
 
+  // One place decides cockpit vs chase for the HUD and the interior:
+  // the live loop and the screenshot staging both call it before they
+  // render, so a shot can never show the wrong horizon or a missing dash.
+  function syncCockpitView() {
+    var inCockpit = cameraCtl.getMode() === 'cockpit' || cameraCtl.getPreset() === 2;
+    cockpitMod.setVisible(inCockpit);
+    cockpitMod.pose(state);
+    hud.setView(inCockpit ? 'cockpit' : 'chase');
+  }
+
   function renderFrame() {
     if (!state) return;
     plane.setBladesVisible(!(cameraCtl.getMode() === 'cockpit' || cameraCtl.getPreset() === 2));
@@ -300,6 +318,7 @@
     if (screen === 'play' && !state.onGround) plane.pushTrail(state);
     cameraCtl.update(state, STEP, time);
     world.update(time);
+    syncCockpitView();
     hud.update(state, mission, waypointFor(), time);
     renderer.render(scene, camera);
   }
@@ -435,11 +454,14 @@
       // left toward the gate with the peak framed beyond the ring.
       // The heading sits a touch right of the gate, so the ring rides
       // left of the horizon instrument instead of behind it.
+      // v2: the frame shows the ring pass itself — rings 1-4 already
+      // green behind the plane, the combo banner up, the VSI climbing.
       state.position = { x: -250, y: 185, z: -580 };
       state.heading = -2.45;
       state.pitch = -0.05;
       state.roll = 0.44;
       state.speed = 60.7;
+      state.verticalSpeed = 2.0;
       state.throttle = 0.65;
       state.flaps = 0;
       state.fuel = 78;
@@ -449,21 +471,31 @@
       state.combo = 3;
       state.score = 1450;
       nextRing = 4;
+      for (var r = 0; r < 4; r += 1) {
+        world.rings[r].passed = true;
+        world.rings[r].mesh.material.color.setHex(0x4dff9e);
+      }
       cameraCtl.setPreset(1);
+      hud.showBanner('RING 4 / 12  +200', 'Combo x3 — tailwind surge', '#4DFF9E', 30, 0);
     } else if (name === 'cockpit') {
       // Threading the canyon gate from above the ring: the gate sits
       // below the horizon instrument, the nose is a slim wedge at the
       // bottom, and the basalt walls frame the shot.
+      // v2: the stress frame — hull 70%, heat 92% and blinking red,
+      // fuel 12% with the LOW FUEL line, climbing on a thermal-less
+      // 295 FPM. The dash, yoke and canopy frame are real geometry now.
       state.position = { x: -210, y: 170, z: -380 };
       state.heading = Math.PI;
       state.pitch = -0.03;
       state.roll = 0.06;
       state.speed = 55;
-      state.throttle = 0.7;
+      state.verticalSpeed = 1.5;
+      state.throttle = 0.65;
       state.flaps = 0;
-      state.fuel = 84;
-      state.engineTemp = 58;
-      state.timeLeft = 210;
+      state.fuel = 12;
+      state.engineTemp = 92;
+      state.hull = 70;
+      state.timeLeft = 143;
       state.ringsPassed = 3;
       state.combo = 2;
       state.score = 820;
@@ -473,37 +505,48 @@
       // Banking past the first buoy: the flight path passes 20 m to the
       // side of it, so the ring reads ahead-right instead of swallowing
       // the frame, and the flare hangs between plane and buoy.
+      // v2: the job is half done — one flare dropped, buoy 1 lit green,
+      // the chute still falling toward the ring, VSI descending.
       state.position = { x: 310, y: 14, z: 30 };
       state.heading = -2.4;
       state.pitch = -0.02;
       state.roll = 0.3;
       state.speed = 45;
+      state.verticalSpeed = -0.8;
       state.throttle = 0.6;
       state.flaps = 1;
       state.fuel = 66;
       state.engineTemp = 71;
       state.timeLeft = 232;
       state.score = 400;
+      state.flaresDropped = 1;
+      state.buoysDone = 1;
+      world.lightBuoy(0);
       world.spawnFlare({ x: 285, y: 12, z: -25 });
       cameraCtl.setPreset(3);
     } else {
-      // landing: flared over the strip threshold, smoke at the wheels.
-      // The approach comes from the north, over the ocean, so the
-      // volcano stays behind the camera and the strip runs to the sea.
-      state.position = { x: 0, y: 121.2, z: 95 };
-      state.heading = 0;
-      state.pitch = -0.1;
+      // landing: wheels just touched on the stack deck, cargo intact.
+      // The touchdown banner grades the landing that just happened, so
+      // the objective, the waypoint and the timer all agree the
+      // delivery is done — no more "STACK DECK 732 m" next to a
+      // touchdown banner. The plane is big in the frame, on the marked
+      // pad, with small smoke at the wheels only.
+      state.position = { x: 520, y: 121.05, z: -412 };
+      state.heading = Math.PI;
+      state.pitch = -0.06;
       state.roll = 0.02;
-      state.speed = 31.4;
-      state.throttle = 0.35;
+      state.speed = 12;
+      state.verticalSpeed = 0;
+      state.throttle = 0.25;
       state.flaps = 2;
-      state.fuel = 41;
+      state.fuel = 38;
       state.engineTemp = 55;
       state.timeLeft = 0;
-      state.score = 2100;
+      state.score = 2400;
+      state.onGround = true;
       state.lastTouchdown = { label: 'SMOOTH TOUCHDOWN', points: 300, fpm: 110 };
-      world.spawnSmoke({ x: 3.5, y: 120.5, z: 88 });
-      world.spawnSmoke({ x: -3.5, y: 120.5, z: 88 });
+      world.spawnSmoke({ x: 518.7, y: 120.5, z: -412 });
+      world.spawnSmoke({ x: 521.3, y: 120.5, z: -412 });
       cameraCtl.setPreset(4);
       hud.showBanner('TOUCHDOWN: 110 FPM — SMOOTH TOUCHDOWN', '+300 points', '#4DFF9E', 30, 0);
     }
@@ -512,6 +555,7 @@
     plane.pose(state, 0);
     world.update(12.5); // fixed time, so the ocean and clouds never move between runs
     cameraCtl.update(state, STEP, 0);
+    syncCockpitView();
     hud.update(state, mission, waypointFor(), 0);
     renderer.render(scene, camera);
     renderer.render(scene, camera);

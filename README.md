@@ -38,6 +38,7 @@ Serve `game/` from any static server and open `index.html` in desktop Chrome, fo
 - `game/js/aircraft.js` — the Cinderwing mesh and moving surfaces
 - `game/js/physics.js` — flight model, fuel, heat, damage, landing grades
 - `game/js/camera.js` — chase, cockpit and screenshot cameras
+- `game/js/cockpit.js` — cockpit interior: dash, dials, canopy frame, yoke, wing roots
 - `game/js/hud.js` — SVG instruments: horizon, tapes, compass, gauges
 - `game/js/main.js` — game loop, input, missions, screenshot mode
 - `main.ts` — entrypoint: copies `game/` and `screenshots/` to `/output` and writes `dossier.json`

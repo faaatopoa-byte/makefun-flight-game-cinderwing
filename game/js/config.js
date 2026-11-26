@@ -46,7 +46,10 @@
     hudGreen: '#4DFF9E',
     hudRed: '#FF5A4D',
     hudCyan: '#37E0FF',
-    bezel: 'rgba(10,18,24,0.72)'
+    // Bezels at 0.88: opaque enough that rocks and smoke never show
+    // through a panel (a v1 frame had canyon rock bleeding through the
+    // compass), still translucent enough to feel like glass.
+    bezel: 'rgba(10,18,24,0.88)'
   };
 
   // Flight model numbers, tuned for a forgiving arcade feel: the plane
@@ -154,7 +157,10 @@
     chaseDistance: 14,
     chaseHeight: 4.5,
     chaseLag: 4.2,
-    cockpitOffset: { x: 0, y: 1.5, z: 2.8 }
+    // The eye sits above the canopy, looking over the nose: low enough
+    // to feel seated, high enough that the fuselage top stays below
+    // the frame instead of wedging white across the dash.
+    cockpitOffset: { x: 0, y: 1.6, z: 1.6 }
   };
 
   window.Cinderwing = window.Cinderwing || {};

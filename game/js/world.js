@@ -71,6 +71,15 @@
     var dome = new THREE.Mesh(geo, mat);
     scene.add(dome);
 
+    // The sun itself, a pale disc low over the water: without it the
+    // sky is a flat gradient with no source for the golden-hour light.
+    var sunDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(110, 24),
+      new THREE.MeshBasicMaterial({ color: 0xfff6d8, fog: false }));
+    sunDisc.position.set(-2160, 1680, 1440);
+    sunDisc.lookAt(0, 0, 0);
+    scene.add(sunDisc);
+
     // Low golden-hour sun, the one light the whole scene is lit by.
     var sun = new THREE.DirectionalLight(P.sun, 1.15);
     sun.position.set(-900, 700, 600);
@@ -97,7 +106,11 @@
       var x = pos.getX(i);
       var z = pos.getZ(i);
       var d = Math.sqrt(x * x + z * z);
+      // Deep water far from land, shallow turquoise near it, plus slow
+      // depth bands so the sea never reads as one flat cyan sheet.
       var t = Math.max(0, Math.min(1, (900 - d) / 900));
+      t += 0.10 * Math.sin(d * 0.045) + 0.06 * Math.sin(x * 0.02 + z * 0.017);
+      t = Math.max(0, Math.min(1, t));
       tmp.copy(deep).lerp(shallow, t * 0.7 + rng() * 0.12);
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
@@ -107,6 +120,46 @@
     ocean.position.y = 0;
     scene.add(ocean);
     oceanBase = pos.array.slice();
+    buildFoam();
+  }
+
+  // Foam where water meets rock, and bright streaks across the channel:
+  // the low rescue skim needs the sea to feel fast underneath it.
+  // Kept narrow and dim: a wide bright ring around the delivery stack
+  // reads as a green halo in the landing frame instead of foam.
+  function buildFoam() {
+    var foamMat = new THREE.MeshBasicMaterial({ color: P.oceanFoam, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    function ring(cx, cz, rIn, rOut) {
+      var m = new THREE.Mesh(new THREE.RingGeometry(rIn, rOut, 28), foamMat);
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(cx, 0.35, cz);
+      scene.add(m);
+    }
+    ring(0, 220, 304, 312); // mesa shore
+    ring(W.volcano.x, W.volcano.z, W.volcano.radius + 2, W.volcano.radius + 8);
+    for (var i = 0; i < W.stacks.length; i += 1) {
+      ring(W.stacks[i].x, W.stacks[i].z, W.stacks[i].radius + 2, W.stacks[i].radius + 6);
+    }
+    // Streaks: long thin foam lines scattered through the rescue
+    // channel, so 46 ft up still reads as speed.
+    var streakMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+    for (var j = 0; j < 26; j += 1) {
+      var streak = new THREE.Mesh(new THREE.PlaneGeometry(10 + rng() * 18, 1 + rng() * 1.5), streakMat);
+      streak.rotation.x = -Math.PI / 2;
+      streak.rotation.z = rng() * Math.PI;
+      streak.position.set(120 + rng() * 420, 0.4, -340 + rng() * 420);
+      scene.add(streak);
+    }
+    // Sun glint: a loose trail of bright flecks on the water toward
+    // the low sun, on the side the rescue camera looks across.
+    var glintMat = new THREE.MeshBasicMaterial({ color: 0xfff2d6, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+    for (var k = 0; k < 14; k += 1) {
+      var glint = new THREE.Mesh(new THREE.PlaneGeometry(6 + rng() * 14, 1.5 + rng() * 2), glintMat);
+      glint.rotation.x = -Math.PI / 2;
+      glint.rotation.z = 0.5 + rng() * 0.4;
+      glint.position.set(-500 - rng() * 400, 0.45, 150 + rng() * 350);
+      scene.add(glint);
+    }
   }
 
   // A stepped mesa: three stacked slabs, grass on top, terracotta and
@@ -163,11 +216,29 @@
   }
 
   // Two long basalt walls with a flyable gap between them: the canyon.
+  // The walls are painted in horizontal strata (basalt and terracotta
+  // bands every 18 m), so they read as layered cliff, not grey slabs.
   function buildCanyon() {
     var c = W.canyon;
+    function strataPaint(geo) {
+      var pos = geo.attributes.position;
+      var colors = new Float32Array(pos.count * 3);
+      var dark = new THREE.Color(P.basalt);
+      var light = new THREE.Color(P.basaltLight);
+      var rust = new THREE.Color(P.terracotta);
+      var tmp = new THREE.Color();
+      for (var i = 0; i < pos.count; i += 1) {
+        var band = Math.floor((pos.getY(i) + c.wallHeight / 2) / 18) % 3;
+        tmp.copy(band === 2 ? rust : (band === 1 ? light : dark));
+        var shade = 0.9 + rng() * 0.2;
+        colors[i * 3] = tmp.r * shade; colors[i * 3 + 1] = tmp.g * shade; colors[i * 3 + 2] = tmp.b * shade;
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      return geo;
+    }
     var wallGeo = new THREE.BoxGeometry(60, c.wallHeight, c.length);
     jitterGeometry(wallGeo, 8);
-    paintVertices(wallGeo, P.basalt, P.basaltLight, true);
+    strataPaint(wallGeo);
     var mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     var left = new THREE.Mesh(wallGeo, mat);
     left.position.set(c.x - c.gapWidth / 2 - 30, c.wallHeight / 2, c.z);
@@ -237,18 +308,39 @@
       scene.add(mesh);
     }
     // The delivery deck: a flat pad on the first stack with a painted H.
+    // The pad top sits at the stack top (y 120), which is also the
+    // physics ground there: a plane landing on it must sit on the pad,
+    // not sink three metres into it.
     var deck = W.stackDeck;
     var pad = new THREE.Mesh(
       new THREE.CylinderGeometry(deck.radius, deck.radius + 4, 4, 12),
       lambert(P.runway));
-    pad.position.set(deck.x, deck.y, deck.z);
+    pad.position.set(deck.x, deck.y - 4, deck.z);
     scene.add(pad);
     var target = new THREE.Mesh(
-      new THREE.RingGeometry(deck.radius - 14, deck.radius - 10, 24),
+      new THREE.RingGeometry(deck.radius - 18, deck.radius - 16, 24),
       new THREE.MeshBasicMaterial({ color: P.ringDone, side: THREE.DoubleSide }));
     target.rotation.x = -Math.PI / 2;
-    target.position.set(deck.x, deck.y + 2.2, deck.z);
+    target.position.set(deck.x, deck.y - 1.8, deck.z);
     scene.add(target);
+    // Threshold bars across the approach edge of the pad, and green
+    // edge lights around the rim: the deck must read as a landing pad,
+    // not a bare rock top.
+    var deckLineMat = new THREE.MeshBasicMaterial({ color: P.runwayLine });
+    for (var b = 0; b < 3; b += 1) {
+      var dbar = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.6), deckLineMat);
+      dbar.rotation.x = -Math.PI / 2;
+      dbar.position.set(deck.x - 6 + b * 6, deck.y - 1.8, deck.z + deck.radius - 4);
+      scene.add(dbar);
+    }
+    for (var e = 0; e < 8; e += 1) {
+      var ang = (e / 8) * Math.PI * 2;
+      var elight = new THREE.Mesh(
+        new THREE.SphereGeometry(1.2, 6, 5),
+        new THREE.MeshBasicMaterial({ color: P.ringDone }));
+      elight.position.set(deck.x + Math.cos(ang) * (deck.radius + 1), deck.y - 1.5, deck.z + Math.sin(ang) * (deck.radius + 1));
+      scene.add(elight);
+    }
   }
 
   function buildRunway() {
@@ -274,6 +366,29 @@
         new THREE.MeshBasicMaterial({ color: P.ringDone }));
       lamp.position.set(r.x + r.width / 2 + 6 + j * 4, r.y + 2, r.z - r.length / 2 + 26);
       scene.add(lamp);
+    }
+    // Edge lights down both sides of the strip, so the runway reads
+    // as a runway from the air instead of a dark slab.
+    var edgeMat = new THREE.MeshBasicMaterial({ color: 0xfff2d6 });
+    for (var k = 0; k < 9; k += 1) {
+      var ez = r.z - r.length / 2 + 14 + k * 29;
+      var eL = new THREE.Mesh(new THREE.SphereGeometry(1.1, 6, 5), edgeMat);
+      eL.position.set(r.x - r.width / 2 - 2, r.y + 1.5, ez);
+      scene.add(eL);
+      var eR = new THREE.Mesh(new THREE.SphereGeometry(1.1, 6, 5), edgeMat);
+      eR.position.set(r.x + r.width / 2 + 2, r.y + 1.5, ez);
+      scene.add(eR);
+    }
+    // Threshold bars at both ends of the strip.
+    for (var m = 0; m < 3; m += 1) {
+      var barN = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.6), lineMat);
+      barN.rotation.x = -Math.PI / 2;
+      barN.position.set(r.x - 5 + m * 5, r.y + 0.6, r.z - r.length / 2 + 8);
+      scene.add(barN);
+      var barS = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.6), lineMat);
+      barS.rotation.x = -Math.PI / 2;
+      barS.position.set(r.x - 5 + m * 5, r.y + 0.6, r.z + r.length / 2 - 8);
+      scene.add(barS);
     }
     // Windsock on a pole at the far end.
     var pole = new THREE.Mesh(
@@ -339,8 +454,18 @@
       group.add(target);
       group.position.set(b.x, 0, b.z);
       scene.add(group);
-      buoys.push({ index: i, position: new THREE.Vector3(b.x, 0, b.z), group: group, done: false });
+      buoys.push({ index: i, position: new THREE.Vector3(b.x, 0, b.z), group: group, target: target, light: light, done: false });
     }
+  }
+
+  // A lit buoy: its drop ring turns green and its mast lamp goes
+  // green, so the rescue frame can show the job half done.
+  function lightBuoy(index) {
+    var b = buoys[index];
+    if (!b || b.done) return;
+    b.done = true;
+    b.target.material.color.setHex(P.ringDone);
+    b.light.material.color.setHex(P.ringDone);
   }
 
   function buildThermals() {
@@ -536,6 +661,7 @@
     terrainHeightAt: terrainHeightAt,
     spawnFlare: spawnFlare,
     spawnSmoke: spawnSmoke,
+    lightBuoy: lightBuoy,
     rings: rings,
     buoys: buoys
   };
