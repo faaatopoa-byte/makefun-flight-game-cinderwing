@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cinderwing — a solar bush plane over a volcanic archipelago</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="scene" width="1280" height="720" aria-label="Cinderwing flight game: a solar bush plane flying over volcanic islands"></canvas>
+<svg id="hud" width="1280" height="720" aria-hidden="true"></svg>
+
+<div id="title" class="overlay">
+  <div class="panel">
+    <p class="kicker">Solar bush flying · Volcanic archipelago</p>
+    <h1>Cinderwing</h1>
+    <p class="deck">A solar-assisted bush plane, three jobs, one cliff runway, and fuel that never lasts as long as you want. Three missions. Fuel and damage. Keyboard and mouse.</p>
+    <div class="missions">
+      <button class="mission-card selected" type="button" data-mission="0">
+        <span class="mission-num">1</span>
+        <span class="mission-name">Caldera Ring Run</span>
+        <span class="mission-brief">Thread 12 wind rings through the arches. A ring is a tailwind surge. A miss costs 5 seconds.</span>
+      </button>
+      <button class="mission-card" type="button" data-mission="1">
+        <span class="mission-num">2</span>
+        <span class="mission-name">Buoy Flare Rescue</span>
+        <span class="mission-brief">Skim low at 30 to 60 feet. Drop a flare into each buoy ring, then race the battery home.</span>
+      </button>
+      <button class="mission-card" type="button" data-mission="2">
+        <span class="mission-num">3</span>
+        <span class="mission-name">Sea-Stack Cryo Delivery</span>
+        <span class="mission-brief">Carry fragile medical cores across a gusty channel. Land soft on the stack deck or the cargo fractures.</span>
+      </button>
+    </div>
+    <button id="startBtn" class="primary" type="button">Fly the selected mission</button>
+    <p class="controls">W/S pitch · A/D roll · Q/E rudder · Shift/Ctrl throttle · G flaps · Space flare · C camera · P pause · Mouse: hold to steer</p>
+  </div>
+</div>
+
+<div id="paused" class="overlay" style="display:none">
+  <div class="panel small">
+    <h2>Paused</h2>
+    <p>Press P to keep flying.</p>
+  </div>
+</div>
+
+<div id="gameover" class="overlay" style="display:none">
+  <div class="panel small">
+    <h2 id="overTitle">Flight over</h2>
+    <p id="overScore"></p>
+    <p id="overSub"></p>
+    <button id="retryBtn" class="primary" type="button">Fly again (R)</button>
+    <button id="menuBtn" class="secondary" type="button">Missions (M)</button>
+  </div>
+</div>
+
+<p id="help" class="help" style="display:none">W/S pitch · A/D roll · Q/E rudder · Shift/Ctrl throttle · G flaps · Space flare · C camera · P pause</p>
+<p id="status" role="status" aria-live="polite"></p>
+
+<script src="./vendor/three.min.js"></script>
+<script src="./js/config.js"></script>
+<script src="./js/audio.js"></script>
+<script src="./js/world.js"></script>
+<script src="./js/aircraft.js"></script>
+<script src="./js/physics.js"></script>
+<script src="./js/camera.js"></script>
+<script src="./js/hud.js"></script>
+<script src="./js/main.js"></script>
+</body>
+</html>
